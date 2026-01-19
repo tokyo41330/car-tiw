@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Car Dodge Game</title>
+<style>
+  body, html { margin: 0; padding: 0; overflow: hidden; background: black; }
+  
+  #startScreen {
+    position: absolute; 
+    top: 0; left: 0; 
+    width: 100%; height: 100%;
+    background: url('bg.png') no-repeat center center/cover;
+    color: white; 
+    display: flex; 
+    justify-content: center; 
+    align-items: center;
+    flex-direction: column; 
+    font-family: sans-serif; 
+    font-size: 24px;
+  }
+  #startScreen img.car {
+    width: 120px;
+    margin-bottom: 20px;
+  }
+  
+  #gameOverScreen { 
+    position: absolute; 
+    top: 0; left: 0; 
+    width: 100%; height: 100%; 
+    background: rgba(0,0,0,0.8); 
+    color: white; 
+    display: flex; 
+    justify-content: center; 
+    align-items: center; 
+    flex-direction: column; 
+    font-family: sans-serif; 
+    font-size: 24px; 
+    display: none;
+  }
+  
+  #timerDisplay { 
+    position: absolute; 
+    top: 10px; left: 10px; 
+    color: white; 
+    font-family: sans-serif; 
+    font-size: 20px; 
+  }
+  
+  button { 
+    font-size: 24px; 
+    padding: 10px 20px; 
+    cursor: pointer;
+  }
+  
+  #gameCanvas { 
+    background: black; 
+    display: block; 
+    margin: 0 auto; 
+  }
+</style>
+</head>
+<body>
+  <div id="startScreen">
+    <img src="car.png" class="car" alt="Car Image" />
+    <div>🚗 Car Dodge Game</div>
+    <button id="startButton">Start Game</button>
+  </div>
+
+  <div id="gameOverScreen">
+    <div id="finalScore"></div>
+    <button id="restartButton">Play Again</button>
+  </div>
+
+  <div id="timerDisplay">Time: 0 sec</div>
+
+  <canvas id="gameCanvas" width="400" height="600"></canvas>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const laneWidth = canvas.width / 3;
+const carWidth = 40;
+const carHeight = 80;
+const obstacleWidth = 50;
+const obstacleHeight = 50;
+const minGap = carHeight * 2;
+let carLane = 1;
+let speed = 2;
+let score = 0;
+let obstacles = [];
+let gameActive = false;
+let startTime = 0;
+
+// โหลดภาพรถและพื้นหลัง
+const carImg = new Image(); carImg.src = 'car.png';
+const bgImg = new Image(); bgImg.src = 'bg.png';
+
+// โหลดภาพสิ่งกีดขวาง 4 ภาพแบบสุ่ม
+const obstacleImgs = [new Image(), new Image(), new Image(), new Image()];
+obstacleImgs[0].src = 'a.png';
+obstacleImgs[1].src = 'b.png';
+obstacleImgs[2].src = 'c.png';
+obstacleImgs[3].src = 'd.png';
+
+// โหลดเสียงเริ่มเกม, เสียงในเกม, เสียงเกมโอเวอร์
+const startSound = new Audio('');
+const gameSound = new Audio('game.mp3');
+gameSound.loop = true;
+const gameOverSound = new Audio('gameover.mp3');
+
+function drawCar() {
+  ctx.drawImage(carImg, carLane * laneWidth + (laneWidth - carWidth)/2, canvas.height - carHeight - 10, carWidth, carHeight);
+}
+function drawObstacles() {
+  obstacles.forEach(ob => {
+    ctx.drawImage(ob.img, ob.lane * laneWidth + (laneWidth - obstacleWidth)/2, ob.y, obstacleWidth, obstacleHeight);
+  });
+}
+function updateObstacles() {
+  obstacles.forEach(ob => ob.y += speed);
+  if (obstacles.length === 0 || obstacles[obstacles.length - 1].y > 150) {
+    const possibleLanes = [0, 1, 2].filter(lane => !obstacles.some(ob => ob.lane === lane && (canvas.height - ob.y - obstacleHeight) < minGap));
+    if (possibleLanes.length > 0) {
+      const lane = possibleLanes[Math.floor(Math.random() * possibleLanes.length)];
+      const img = obstacleImgs[Math.floor(Math.random() * obstacleImgs.length)];
+      obstacles.push({ lane: lane, y: -obstacleHeight, img: img });
+    }
+  }
+  obstacles = obstacles.filter(ob => ob.y < canvas.height);
+}
+function checkCollision() {
+  for (let ob of obstacles) {
+    if (ob.lane === carLane && ob.y + obstacleHeight > canvas.height - carHeight - 10 && ob.y < canvas.height - 10) {
+      endGame();
+    }
+  }
+}
+function gameLoop() {
+  if (!gameActive) return;
+  ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
+  drawCar();
+  drawObstacles();
+  updateObstacles();
+  checkCollision();
+  score++;
+  if (score % 60 === 0) {
+    const timeInSeconds = Math.floor(score / 60);
+    document.getElementById('timerDisplay').innerText = 'Time: ' + timeInSeconds + ' sec';
+  }
+  if (score % 500 === 0) { speed *= 1.1; }
+  requestAnimationFrame(gameLoop);
+}
+function startGame() {
+  startSound.play();
+  gameSound.currentTime = 0;
+  gameSound.play();
+  document.getElementById('startScreen').style.display = 'none';
+  document.getElementById('gameOverScreen').style.display = 'none';
+  document.getElementById('timerDisplay').innerText = 'Time: 0 sec';
+  carLane = 1;
+  speed = 2;
+  score = 0;
+  obstacles = [];
+  gameActive = true;
+  startTime = Date.now();
+  gameLoop();
+}
+function endGame() {
+  gameSound.pause();
+  gameOverSound.play();
+  gameActive = false;
+  const timeInSeconds = Math.floor(score / 60);
+  document.getElementById('finalScore').innerText = 'Game Over! Time: ' + timeInSeconds + ' sec';
+  document.getElementById('gameOverScreen').style.display = 'flex';
+}
+document.getElementById('startButton').addEventListener('click', startGame);
+document.getElementById('restartButton').addEventListener('click', startGame);
+document.addEventListener('keydown', (e) => {
+  if (!gameActive) return;
+  if (e.key === 'ArrowLeft' && carLane > 0) carLane--;
+  else if (e.key === 'ArrowRight' && carLane < 2) carLane++;
+});
+</script>
+</body>
+</html>
